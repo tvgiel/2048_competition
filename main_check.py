@@ -5,6 +5,7 @@
 import agents.gemini_AI as model1
 import agents.random_AI as randommodel
 import agents.one_direction_AI as one_direction_model
+import convolutional_model as Convolutionalmodel
 import numpy as np
 
 

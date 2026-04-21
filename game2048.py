@@ -86,7 +86,7 @@ class Game2048Env:
         
 
     def get_state(self):
-        """Returns the current board. Using log2 helps Neural Networks process the data."""
+        """Returns the current board."""
         return self.board.copy()
 
     def _slide_and_merge(self, row):

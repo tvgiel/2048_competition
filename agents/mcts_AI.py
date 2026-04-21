@@ -3,6 +3,7 @@ import multiprocessing as mp
 import numpy as np
 import random
 import time
+from typing import Any, Dict, Iterable, Optional
 from game2048 import Game2048Env
 
 def simulate_random_game(env, max_steps=100):
@@ -63,7 +64,94 @@ def get_best_move_mc(env, simulations_per_action=100, max_steps=100):
     best_idx = np.argmax(scores)
     return actions[best_idx]
 
+def get_best_move_mc(
+    env,
+    simulations_per_action=100,
+    max_steps=100,
+    candidate_actions: Optional[Iterable[int]] = None,
+    use_multiprocessing: bool = True
+):
+    """Finds the best move using Monte Carlo rollouts (optionally parallel)."""
+    actions = list(candidate_actions) if candidate_actions is not None else env.get_available_actions()
+    if not actions:
+        return -1
+
+    if len(actions) == 1:
+        return actions[0]
+
+    pool_args = [(env, action, simulations_per_action, max_steps) for action in actions]
+
+    if use_multiprocessing and len(actions) > 1:
+        with mp.Pool(processes=min(len(actions), mp.cpu_count())) as pool:
+            scores = pool.map(evaluate_action, pool_args)
+    else:
+        scores = [evaluate_action(args) for args in pool_args]
+
+    best_idx = int(np.argmax(scores))
+    return actions[best_idx]
+
+def _state_to_env(template_env: Game2048Env, state: Any) -> Game2048Env:
+    """Builds an environment from a raw state array or returns a copied env if already env-like."""
+    if hasattr(state, "step") and hasattr(state, "get_available_actions") and hasattr(state, "board"):
+        return copy.deepcopy(state)
+
+    env = copy.deepcopy(template_env)
+    board = np.array(state)
+
+    if board.size == 16 and board.shape != (4, 4):
+        board = board.reshape(4, 4)
+
+    env.board = board.astype(int)
+    env.done = False
+    return env
+
+def train_and_instantiate():
+    """
+    Required API.
+    MCTS is planning-based, so there is no offline training phase.
+    Returns a configured agent object.
+    """
+    return {
+        "template_env": Game2048Env(),
+        "simulations_per_action": 75,
+        "max_steps": 100,
+        "use_multiprocessing": False,  # safer default for evaluation harnesses
+    }
+
+def act(agent, state, valid_actions):
+    """
+    Required API.
+    Chooses an action in {0,1,2,3} using Monte Carlo rollouts.
+    """
+    if not valid_actions:
+        return -1
+
+    env = _state_to_env(agent["template_env"], state)
+
+    return get_best_move_mc(
+        env=env,
+        simulations_per_action=agent.get("simulations_per_action", 75),
+        max_steps=agent.get("max_steps", 100),
+        candidate_actions=valid_actions,
+        use_multiprocessing=agent.get("use_multiprocessing", False),
+    )
+
 if __name__ == "__main__":
+    
+    def play_game(agent):
+        # always load the game environment first so then the agent can interact with it
+        env = Game2048Env()
+        state = env.reset()
+
+        # Do not change the code below, as this is the main loop of the game. The agent should interact with the environment through this loop.
+        while not env.done:
+            valid_actions = env.get_available_actions()
+            action = agent.act(state, valid_actions)
+            next_state, reward, done, info = env.step(action)
+            state = next_state
+        return info['score'], info['highest_tile']
+    
+    
     env = Game2048Env()
     start_state = env.reset()
     
@@ -87,7 +175,7 @@ if __name__ == "__main__":
         _, reward, done, info = env.step(best_action)
         moves += 1
         
-        if moves % 20 == 0 or done:
+        if moves % 1 == 0 or done:
             print(f"Move {moves} | Played {action_map[best_action]} | Max tile {np.max(env.board)} | Score {env.score}")
             env.render()
             
@@ -99,3 +187,5 @@ if __name__ == "__main__":
     print(f"Total Moves: {moves}")
     print(f"Time Taken: {total_time:.2f} seconds")
     print("==============================")
+
+

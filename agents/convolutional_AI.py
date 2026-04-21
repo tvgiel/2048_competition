@@ -145,61 +145,76 @@ class Agent:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
             
+
+def instantiate_and_train():
+    # Assuming Game2048Env is defined in your code
+    env = Game2048Env()
+    agent = Agent()
+
+
+    episodes = 500
+    save_every = 10
+
+    # Load the model if it exists
+    for model_nr in range(500,0,-save_every):
+        model_path = f"convolutional_model_checkpoint_episode_{model_nr}.pt"
+        print("checking", model_path)
+        if os.path.exists(model_path):
+            agent.model.load_state_dict(torch.load(model_path))
+            print(f"Model loaded from {model_path}")
+            break
+    else:
+        print("No saved model found. Starting with a new model.")
+
+    for episode in range(model_nr, episodes):
+        state = env.reset()
+        done = False
+        
+        while not done:
+            valid_actions = env.get_available_actions()
             
-# Assuming Game2048Env is defined in your code
-env = Game2048Env()
-agent = Agent()
+            # 1. AI chooses an action
+            action = agent.act(state, valid_actions)
+            
+            # 2. Environment takes a step
+            next_state, reward, done, info = env.step(action)
+            
+            # 3. Save the result to memory
+            agent.memory.append((state, action, reward, next_state, done))
+            
+            # 4. Train the brain
+            agent.train_step()
+            
+            state = next_state
+        # At the end of your episode loop:
+        if episode % 10 == 0:
+            agent.target_model.load_state_dict(agent.model.state_dict())
+            
+        print(f"Episode {episode + 1}/{episodes} - Score: {info['score']} - Max Tile: {info['highest_tile']} - Epsilon: {agent.epsilon:.2f}")
+        
+        # Save model every 10 episodes
+        if (episode + 1) % 10 == 0:
+            torch.save(agent.model.state_dict(), f"convolutional_model_checkpoint_episode_{episode + 1}.pt")
+            print(f"Model saved at episode {episode + 1}")
+            
+            # Delete the checkpoint from 10 episodes ago
+            old_episode = episode + 1 - 10
+            if old_episode > 0:
+                old_model_path = f"convolutional_model_checkpoint_episode_{old_episode}.pt"
+                if os.path.exists(old_model_path):
+                    os.remove(old_model_path)
+                    print(f"Deleted old checkpoint: {old_model_path}")
+                    
 
+    return agent
 
-episodes = 500
-save_every = 10
-
-# Load the model if it exists
-for model_nr in range(500,0,-save_every):
-    model_path = f"model_checkpoint_episode_{model_nr}.pt"
-    print("checking", model_path)
-    if os.path.exists(model_path):
-        agent.model.load_state_dict(torch.load(model_path))
-        print(f"Model loaded from {model_path}")
-        break
-else:
-    print("No saved model found. Starting with a new model.")
-
-for episode in range(model_nr, episodes):
+def play_game(agent):
+    env = Game2048Env()
     state = env.reset()
-    done = False
-    
-    while not done:
+
+    while not env.done:
         valid_actions = env.get_available_actions()
-        
-        # 1. AI chooses an action
         action = agent.act(state, valid_actions)
-        
-        # 2. Environment takes a step
         next_state, reward, done, info = env.step(action)
-        
-        # 3. Save the result to memory
-        agent.memory.append((state, action, reward, next_state, done))
-        
-        # 4. Train the brain
-        agent.train_step()
-        
         state = next_state
-    # At the end of your episode loop:
-    if episode % 10 == 0:
-        agent.target_model.load_state_dict(agent.model.state_dict())
-        
-    print(f"Episode {episode + 1}/{episodes} - Score: {info['score']} - Max Tile: {info['highest_tile']} - Epsilon: {agent.epsilon:.2f}")
-    
-    # Save model every 10 episodes
-    if (episode + 1) % 10 == 0:
-        torch.save(agent.model.state_dict(), f"model_checkpoint_episode_{episode + 1}.pt")
-        print(f"Model saved at episode {episode + 1}")
-        
-        # Delete the checkpoint from 10 episodes ago
-        old_episode = episode + 1 - 10
-        if old_episode > 0:
-            old_model_path = f"model_checkpoint_episode_{old_episode}.pt"
-            if os.path.exists(old_model_path):
-                os.remove(old_model_path)
-                print(f"Deleted old checkpoint: {old_model_path}")
+    return info['score'], info['highest_tile']
