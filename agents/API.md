@@ -1,3 +1,0 @@
-The 2048 AI player needs to have the following functions:
-- `train_and_instantiate()`: a function without arguments. When this function is called, the model is initialised and trained. returns a trained model.
-- `act(agent, state, valid_actions)`: a function that takes the trained model as an argument. When this function is called, it receives the current state of the game and the valid actions. It should return the action that the agent wants to take (a number between 0 and 3).

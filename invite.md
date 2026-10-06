@@ -27,9 +27,11 @@ same as the ones provided to you.
 # Submission API and rules
 
 The submitted code has to be named `agent_<yourname>.py` or
-`agent_<yourname>.jl`. It needs the same main functions as provided to
-you [TBD HOW]{style="color: red"}. Your submission needs some functions
-for us to test it easily:
+`agent_<yourname>.jl`. Each participant may submit one entry. A submission
+may contain at most two files, unless the jury agrees to an exception.
+
+Your submission must provide the following functions so that it can be tested
+automatically:
 
 - `train_and_instantiate()`: a function without arguments. When this
   function is called, the model is initialised and trained. returns a
@@ -48,10 +50,9 @@ submissions must strictly adhere to the following limitations:
 1.  **Language Constraints:** Agents must be written in **Python**
     (`.py`) or **Julia** (`.jl`).
 
-2.  Your agent may take at most 1 hour to train on a simple, CPU-only
-    laptop. and [30 minutes, tbd]{style="color: red"} to execute.
-    Training will be stopped at 1 hour, and the resulting agent will be
-    used for scoring.
+2.  There is no limit on development or training time before submission. The
+  agent must train itself from the provided environment and may not load
+  externally trained weights.
 
 3.  **Zero-Argument Execution:** Your submitted file must be fully
     executable by calling the file directly **without any command-line
@@ -63,39 +64,60 @@ submissions must strictly adhere to the following limitations:
     - For Julia submissions, the evaluation server will run:
       `julia agent_yourname.jl`
 
-4.  **Self-Contained Logic:** Your script must handle its own
-    environment setup. It cannot load any pre-trained weights.
+4.  **Evaluation Time:** All 100 games for an agent must be completed within
+  30 minutes, including any model initialization or training performed by
+  the submission.
 
-5.  **Dependencies:** You may use standard data science and machine
+5.  **Self-Contained Logic:** Your script must handle its own environment
+  setup and training. It may not depend on files, models, or data that are
+  not included in the submission.
+
+6.  **Model Size:** The maximum permitted size of a submitted model and its
+  included files will be announced by the jury before submissions open.
+
+7.  **Dependencies:** You may use standard data science and machine
     learning libraries. For python these include PyTorch, TensorFlow,
     and everything in anaconda python version 3.19.3. In Julia, this
-    includes Flux.jl EN NOG ANDERE TE BEPALEN . A list of pre-installed
-    environment packages will be provided. If you have custom
-    dependencies, include a `requirements.txt` or `Project.toml`.
+  includes (F)lux.jl and the other packages listed in the published
+  competition environment. If you need a package that is not
+  pre-installed, discuss it with the jury before submission and include
+  the required dependency declaration (`requirements.txt` for Python or
+  `Project.toml` for Julia).
 
 # Evaluation and Scoring
 
 Submissions will be evaluated on a secure server to prevent environment
 manipulation.
 
-- **Trials:** Each AI will play 10 games, until the end.
+- **Trials:** Each AI will play 100 games, until the end. Agents will take
+  turns playing one game at a time so that live scores and progress graphs
+  can be updated during the event.
 
 - **Primary Metric:** Competitors will be ranked based purely on the
-  **average final score** across all 10 games.
+  **average final score** across all 100 games.
 
 - **Tie-breaker:** In the event of identical average scores, the maximum
-  tile achieved across the 100 episodes (e.g., reaching 8192 vs 4096)
+  tile achieved across the 100 games (e.g., reaching 8192 rather than 4096)
   will determine the winner.
 
-# TODO
+- **Logging:** Scores and other agreed evaluation statistics will be logged
+  throughout the event and used to update the live graphs.
 
-\- 1 entry per person - geen limiet om traintijd - 100 games spelen in
-max 30 minuten - model maximaal aantal MB - indien speciale packages,
-overleg met Jury - zelf trainen - gemiddelde alle scores - verwijs naar
-regels van het spel - code van spel zelf geven (python en julia) - code
-van test-environment geven (python en julia) - maximum 2 files indienen
-(tenzij in overleg) - elk om beurt 1 spel spelen. Zo live grafieken
-hebben om te updaten. (log as voor de punten) - bijnamen verzinnen voor
-de modellen
+# Rules and Provided Code
+
+The competition uses the standard rules of 2048: equal adjacent tiles merge
+once per move, tiles slide as far as possible, and a new tile appears after a
+valid move. A new tile is a 2 with 90% probability or a 4 with 10% probability.
+For a general description of the original game rules, see the
+[official 2048 game](https://play2048.co/).
+
+The Python and Julia source code for the game itself and for the evaluation
+environment will be provided to all participants. The supplied environment is
+the authoritative specification for scoring and behavior.
+
+# Event Details
+
+Each submitted agent must have a nickname. The nickname will be used to
+identify the model in the live stream and in the score display.
 
 Good luck, and may the best AI win!
