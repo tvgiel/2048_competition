@@ -27,7 +27,7 @@ def play_game(agent):
 # training the model #
 ######################
 print("start training")
-model = model1.instantiate_and_train()
+model = model1.train_and_instantiate()
 print("training finished")
 
 

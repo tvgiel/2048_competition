@@ -3,8 +3,8 @@
 Welcome to the 2048 AI Solving Competition! Your objective is to build a
 Reinforcement Learning agent, search algorithm, or heuristic bot capable
 of mastering the classic game of 2048. Participants are provided with
-the complete, open-source Python environment to develop and train their
-models locally before submitting them for final evaluation.
+the complete, open-source Python/Julia environment to develop and train their
+models locally before submitting them for final evaluation. 
 
 # The Environment
 

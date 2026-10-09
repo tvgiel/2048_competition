@@ -48,7 +48,7 @@ environment. The Python versions are `reset` and `step`.
 ## 2) Agent API (competition interface)
 Each AI agent file must implement:
 
-- **`train_and_instantiate()`**: creates (and optionally trains) the agent; returns the agent object.
+- **`train_and_instantiate()`**: creates (and optionally trains) the agent; returns the agent object.If training takes a long time, save the trained model to disk and load it in this function.
 - **`act(agent, state, valid_actions)`**: chooses and returns one action (`0` to `3`) using the current state and valid actions.
 
 In short, the environment API runs the game, and the agent API plugs an AI policy into that game loop.
