@@ -21,6 +21,13 @@ class Game2048Env:
         self._spawn_tile()
         return self.get_state()
 
+    @staticmethod
+    def _state_copy(board):
+        """Return a state snapshot that agents cannot modify accidentally."""
+        state = board.copy()
+        state.setflags(write=False)
+        return state
+
     def step(self, action):
         """
         Takes an action and advances the environment state.
@@ -87,7 +94,7 @@ class Game2048Env:
 
     def get_state(self):
         """Returns the current board."""
-        return self.board.copy()
+        return self._state_copy(self.board)
 
     def _slide_and_merge(self, row):
         """Core logic: slides non-zero elements left and merges adjacent duplicates."""
