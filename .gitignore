@@ -4,3 +4,4 @@ agents/game2048.py
 agents/*
 invite.tex
 nosync/*
+test.py
