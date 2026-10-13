@@ -48,7 +48,7 @@ To ensure a standardized and automated evaluation process, all
 submissions must strictly adhere to the following limitations:
 
 1.  **Language Constraints:** Agents must be written in **Python**
-    (`.py`) or **Julia** (`.jl`).
+    (`.py`) or **Julia** (`.jl`). Everything must be contained within a single file, except for an optional second helper file.
 
 2.  There is no limit on development or training time before submission. The
   agent must train itself from the provided environment and may not load

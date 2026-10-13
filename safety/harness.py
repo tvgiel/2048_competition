@@ -63,7 +63,7 @@ class Config:
     image: str = "2048-eval:latest"
     use_docker: bool = True
     games: int = 100
-    master_seed: int = 2048
+    master_seed: int = 6767
     total_budget: float = 1800.0        # seconds: training + all games, per agent
     move_timeout: float = 5.0           # seconds per move (hang guard)
     first_move_timeout: float = 60.0    # first move of a process (JIT warm-up)

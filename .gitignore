@@ -5,3 +5,6 @@ agents/*
 invite.tex
 nosync/*
 test.py
+results/
+submissions/
+check_*/
