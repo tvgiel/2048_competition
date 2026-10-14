@@ -1,4 +1,4 @@
-# Evaluation image for the 2048 competition (Python + Julia, CPU).
+# Evaluation image for the 2048 competition (Python + Julia + C++17, CPU).
 #
 #   docker build -t 2048-eval:latest .
 #   docker build -t 2048-eval:latest --build-arg WITH_TENSORFLOW=1 .
@@ -15,12 +15,7 @@ ARG JULIA_VERSION=1.10.5
 ARG WITH_TENSORFLOW=0
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# ---- C++ ----------------------------------------------------------------
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates gcc libc6-dev \
+    && apt-get install -y --no-install-recommends curl ca-certificates g++ libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # ---- Julia ----------------------------------------------------------------
