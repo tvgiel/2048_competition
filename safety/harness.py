@@ -170,7 +170,7 @@ class AgentRun:
             return ["julia", f"--threads={c.cpus}", "--startup-file=no",
                     str(HERE / "shim.jl"), str(self.stage / self.entry)]
         cmd = ["docker", "run", "-i", "--rm", "--init", "--name", self.container,
-               "--network", "none", "--read-only", "--tmpfs", "/tmp:rw,nosuid,size=2g",
+               "--network", "none", "--read-only", "--tmpfs", "/tmp:rw,nosuid,exec,size=2g",
                "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                "--user", "65534:65534",
                "--memory", c.memory, "--memory-swap", c.memory,
