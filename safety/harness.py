@@ -48,10 +48,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional
 
-from game2048 import Game2048Env
-
 HERE = Path(__file__).resolve().parent
-NAME_RE = re.compile(r"^agent_([A-Za-z0-9]+)\.(py|jl)$")
+for _p in (HERE.parent, HERE):          # game2048.py may sit here or in the parent folder
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
+from game2048 import Game2048Env
+NAME_RE = re.compile(r"^agent_([A-Za-z0-9]+)\.(py|jl|cpp)$")
+LANGS = {"py": "python", "jl": "julia", "cpp": "cpp"}
+CPP_EXTRA = (".cpp", ".h", ".hpp")      # allowed helper files next to a C++ agent
 DEP_FILES = {"requirements.txt", "Project.toml", "Manifest.toml"}  # not counted towards max_files
 MAX_LINE = 64 * 1024            # longest accepted reply line from an agent
 MAX_STDERR = 5 * 1024 * 1024    # stderr kept per agent
@@ -63,7 +67,7 @@ class Config:
     image: str = "2048-eval:latest"
     use_docker: bool = True
     games: int = 100
-    master_seed: int = 6767
+    master_seed: int = 2048
     total_budget: float = 1800.0        # seconds: training + all games, per agent
     move_timeout: float = 5.0           # seconds per move (hang guard)
     first_move_timeout: float = 60.0    # first move of a process (JIT warm-up)
@@ -108,7 +112,7 @@ def stage_submission(path, max_files=2, max_mb=50.0):
         files = [p for p in items if p.is_file()]
     entries = [f for f in files if NAME_RE.match(f.name)]
     if len(entries) != 1:
-        raise SubmissionError("need exactly one file named agent_<name>.py or agent_<name>.jl "
+        raise SubmissionError("need exactly one file named agent_<name>.py, agent_<name>.jl or agent_<name>.cpp "
                               f"(found {len(entries)})")
     counted = [f for f in files if f.name not in DEP_FILES]
     if len(counted) > max_files:
@@ -116,12 +120,17 @@ def stage_submission(path, max_files=2, max_mb=50.0):
     if sum(f.stat().st_size for f in files) > max_mb * 2 ** 20:
         raise SubmissionError(f"submission larger than {max_mb:g} MB")
     m = NAME_RE.match(entries[0].name)
+    lang = LANGS[m.group(2)]
+    if lang == "cpp":
+        bad = [f.name for f in files if f.name not in DEP_FILES and not f.name.endswith(CPP_EXTRA)]
+        if bad:
+            raise SubmissionError(f"unexpected file(s) in a C++ submission: {', '.join(bad)}")
     stage = Path(tempfile.mkdtemp(prefix="sub_"))
     for f in files:
         shutil.copy2(f, stage / f.name)
         os.chmod(stage / f.name, 0o644)
     os.chmod(stage, 0o755)
-    return stage, entries[0].name, ("python" if m.group(2) == "py" else "julia"), m.group(1)
+    return stage, entries[0].name, lang, m.group(1)
 
 
 class AgentRun:
@@ -165,12 +174,14 @@ class AgentRun:
     def _command(self):
         c = self.cfg
         if not c.use_docker:
+            if self.lang == "cpp":
+                return [str(self.stage / "agent.bin")]
             if self.lang == "python":
                 return [sys.executable, "-B", str(HERE / "shim.py"), str(self.stage / self.entry)]
             return ["julia", f"--threads={c.cpus}", "--startup-file=no",
                     str(HERE / "shim.jl"), str(self.stage / self.entry)]
         cmd = ["docker", "run", "-i", "--rm", "--init", "--name", self.container,
-               "--network", "none", "--read-only", "--tmpfs", "/tmp:rw,nosuid,exec,size=2g",
+               "--network", "none", "--read-only", "--tmpfs", "/tmp:rw,nosuid,size=2g",
                "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                "--user", "65534:65534",
                "--memory", c.memory, "--memory-swap", c.memory,
@@ -184,7 +195,9 @@ class AgentRun:
         if c.gpus:
             cmd += ["--gpus", c.gpus]
         cmd.append(c.image)
-        if self.lang == "python":
+        if self.lang == "cpp":
+            cmd += ["/sub/agent.bin"]
+        elif self.lang == "python":
             cmd += ["python", "-B", "/harness/shim.py", f"/sub/{self.entry}"]
         else:
             cmd += ["julia", "--project=/opt/julia_env", f"--threads={c.cpus}",
@@ -281,10 +294,67 @@ class AgentRun:
                 pass
         shutil.rmtree(self.stage, ignore_errors=True)
 
+    # ---- C++ compilation ------------------------------------------------------
+    CXXFLAGS = ["-O3", "-std=c++17", "-pthread", "-pipe"]
+
+    def _compile(self, log):
+        """Compile agent + shim.cpp into <stage>/agent.bin (no network in Docker mode).
+        Returns None on success or an error string."""
+        c = self.cfg
+        srcs = sorted(f.name for f in self.stage.iterdir() if f.suffix == ".cpp")
+        log_path = self.outdir / f"{self.nick}.compile.log"
+        if c.use_docker:
+            cname = self.container + "-build"
+            cmd = ["docker", "run", "--rm", "--name", cname, "--network", "none",
+                   "--read-only", "--tmpfs", "/tmp:rw,nosuid,size=1g",
+                   "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+                   "--user", "65534:65534", "--memory", c.memory, "--memory-swap", c.memory,
+                   "--cpus", str(c.cpus), "--pids-limit", str(c.pids),
+                   "-v", f"{self.stage}:/sub:rw",
+                   "-v", f"{HERE / 'shim.cpp'}:/harness/shim.cpp:ro", "-w", "/sub",
+                   c.image, "g++", *self.CXXFLAGS, "-I/sub", "-o", "/sub/agent.bin",
+                   "/harness/shim.cpp", *[f"/sub/{n}" for n in srcs]]
+        else:
+            cname = None
+            cmd = ["g++", *self.CXXFLAGS, f"-I{self.stage}", "-o", str(self.stage / "agent.bin"),
+                   str(HERE / "shim.cpp"), *[str(self.stage / n) for n in srcs]]
+        os.chmod(self.stage, 0o777)        # compiler (uid 65534) must write agent.bin
+        try:
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            try:
+                out, _ = p.communicate(timeout=max(1.0, self.remaining()))
+            except subprocess.TimeoutExpired:
+                if cname:
+                    subprocess.run(["docker", "kill", cname], stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
+                p.kill()
+                p.communicate()
+                return "compilation exceeded the time budget"
+        except OSError as e:
+            return f"could not start compiler: {e}"
+        finally:
+            os.chmod(self.stage, 0o755)
+        log_path.write_text(out[-20000:])
+        if p.returncode != 0:
+            return out[-800:]
+        if not (self.stage / "agent.bin").exists():
+            return "compiler produced no binary"
+        os.chmod(self.stage / "agent.bin", 0o755)
+        return None
+
     # ---- lifecycle ------------------------------------------------------------
     def start(self, log=print):
         log(f"[{self.nick}] starting ({self.lang}) and training...")
         t0 = time.monotonic()
+        if self.lang == "cpp":
+            log(f"[{self.nick}] compiling...")
+            err = self._compile(log)
+            if err:
+                self.status, self.detail = "compile_failed", err
+                self.train_seconds = time.monotonic() - t0
+                self.busy += self.train_seconds
+                log(f"[{self.nick}] COMPILE FAILED:\n{err}")
+                return False
         try:
             self.proc = subprocess.Popen(self._command(), stdin=subprocess.PIPE,
                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,

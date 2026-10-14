@@ -21,7 +21,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-import harness
+import safety.harness as harness
 
 
 def static_check(entry: Path, lang: str):
@@ -44,6 +44,13 @@ def static_check(entry: Path, lang: str):
             problems.append("act(agent, state, valid_actions) is not defined at top level")
         elif len(f.args.args) < 3 and not f.args.vararg:
             problems.append("act() must accept three arguments: (agent, state, valid_actions)")
+    elif lang == "cpp":
+        if not re.search(r"void\s+train_and_instantiate\s*\(\s*(void)?\s*\)", text):
+            problems.append("expected: void train_and_instantiate()")
+        if not re.search(r"int\s+act\s*\(\s*const\s+int\s+\w*\s*\[\s*4\s*\]\s*\[\s*4\s*\]\s*,"
+                         r"\s*const\s+std::vector<int>\s*&", text):
+            problems.append("expected exactly: int act(const int state[4][4], "
+                            "const std::vector<int>& valid_actions)")
     else:
         if not re.search(r"function\s+train_and_instantiate\s*\(\s*\)|^\s*train_and_instantiate\s*\(\s*\)\s*=",
                          text, re.M):
@@ -56,7 +63,7 @@ def static_check(entry: Path, lang: str):
 def main():
     d = harness.Config()
     ap = argparse.ArgumentParser(description="Check a 2048 submission against the official harness.")
-    ap.add_argument("submission", help="agent_<name>.py / .jl, or a directory containing it")
+    ap.add_argument("submission", help="agent_<name>.py / .jl / .cpp, or a directory containing it")
     ap.add_argument("--games", type=int, default=5)
     ap.add_argument("--seed", type=int, default=1, help="practice seed (not the official one)")
     ap.add_argument("--image", default=d.image)
