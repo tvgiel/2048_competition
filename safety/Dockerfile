@@ -22,6 +22,7 @@
 # Pin for reproducibility: use a fixed base digest (docker pull the tag, then
 # FROM nvidia/cuda@sha256:...) and freeze the Julia Manifest (see bottom).
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+ENTRYPOINT []
 
 ARG JULIA_VERSION=1.10.5
 ARG WITH_TENSORFLOW=0
