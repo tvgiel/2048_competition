@@ -87,22 +87,23 @@ must strictly adhere to the following limitations:
     network access**, and the file system is read-only except for a temporary
     directory (`/tmp`).
 
-6.  **Model Size:** The maximum permitted size of a submitted model and its
-    included files will be announced by the jury before submissions open.
+6.  **Model Size:** A submission (agent plus any included files) may be at most
+    1 GB.
 
 7.  **Dependencies:** Agents run in the official evaluation Docker image
     (provided in this repository, see `safety/Dockerfile`). It contains
     Python 3.12 with NumPy, SciPy, pandas, scikit-learn, Numba and PyTorch
-    (CPU) and optionally TensorFlow; Julia with Flux.jl, StatsBase.jl and
-    Distributions.jl; and the GNU C++ compiler. The jury will confirm the final
-    package list before submissions open. If you need a package that is not
-    installed, discuss it with the jury before submission and include the
-    required dependency declaration (`requirements.txt` for Python or
-    `Project.toml` for Julia).
+    (CUDA) and optionally TensorFlow; Julia with Flux.jl, CUDA.jl, StatsBase.jl
+    and Distributions.jl; and the GNU C++ compiler plus the CUDA toolkit
+    (`nvcc`). C++ agents may use CUDA in a `.cu` file (compiled with `nvcc`).
+    The jury will confirm the final package list before submissions open. If you
+    need a package that is not installed, discuss it with the jury before
+    submission and include the required dependency declaration
+    (`requirements.txt` for Python or `Project.toml` for Julia).
 
 8.  **Resources:** Each agent runs alone on the evaluation machine, limited to
-    2 CPU cores, 4 GB of memory and 256 processes (the jury will announce the
-    final values and whether a GPU is available).
+    16 CPU cores, 8 GB of memory and 256 processes, with one NVIDIA RTX 4000 Ada
+    GPU (20 GB VRAM) available.
 
 # Evaluation and Scoring
 

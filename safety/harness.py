@@ -53,9 +53,9 @@ for _p in (HERE.parent, HERE):          # game2048.py may sit here or in the par
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 from game2048 import Game2048Env
-NAME_RE = re.compile(r"^agent_([A-Za-z0-9]+)\.(py|jl|cpp)$")
-LANGS = {"py": "python", "jl": "julia", "cpp": "cpp"}
-CPP_EXTRA = (".cpp", ".h", ".hpp")      # allowed helper files next to a C++ agent
+NAME_RE = re.compile(r"^agent_([A-Za-z0-9]+)\.(py|jl|cpp|cu)$")
+LANGS = {"py": "python", "jl": "julia", "cpp": "cpp", "cu": "cpp"}
+CPP_EXTRA = (".cpp", ".h", ".hpp", ".cu", ".cuh")  # allowed helper files next to a C++/CUDA agent
 DEP_FILES = {"requirements.txt", "Project.toml", "Manifest.toml"}  # not counted towards max_files
 MAX_LINE = 64 * 1024            # longest accepted reply line from an agent
 MAX_STDERR = 5 * 1024 * 1024    # stderr kept per agent
@@ -72,10 +72,11 @@ class Config:
     move_timeout: float = 5.0           # seconds per move (hang guard)
     first_move_timeout: float = 60.0    # first move of a process (JIT warm-up)
     illegal: str = "random"             # "random" or "forfeit"
-    cpus: int = 2
-    memory: str = "4g"
+    cpus: int = 16
+    memory: str = "8g"
     pids: int = 256
-    gpus: Optional[str] = None
+    gpus: Optional[str] = None          # None = no GPU; or "all", "device=0", "device=0,1", "device=GPU-<uuid>"
+    cuda_arch: str = "sm_89"            # nvcc target for .cu agents (sm_89 = RTX 4000 Ada / Ada Lovelace)
     max_files: int = 2
     max_mb: float = 50.0
     mode: str = "sequential"            # "sequential" or "interleaved"
@@ -301,7 +302,11 @@ class AgentRun:
         """Compile agent + shim.cpp into <stage>/agent.bin (no network in Docker mode).
         Returns None on success or an error string."""
         c = self.cfg
-        srcs = sorted(f.name for f in self.stage.iterdir() if f.suffix == ".cpp")
+        srcs = sorted(f.name for f in self.stage.iterdir() if f.suffix in (".cpp", ".cu"))
+        use_cuda = any(n.endswith(".cu") for n in srcs)
+        # CUDA agents compile with nvcc (needs the CUDA -devel image); plain C++ stays on g++.
+        compiler = (["nvcc", "-O3", "-std=c++17", f"-arch={c.cuda_arch}", "-Xcompiler", "-pthread"]
+                    if use_cuda else ["g++", *self.CXXFLAGS])
         log_path = self.outdir / f"{self.nick}.compile.log"
         if c.use_docker:
             cname = self.container + "-build"
@@ -312,11 +317,11 @@ class AgentRun:
                    "--cpus", str(c.cpus), "--pids-limit", str(c.pids),
                    "-v", f"{self.stage}:/sub:rw",
                    "-v", f"{HERE / 'shim.cpp'}:/harness/shim.cpp:ro", "-w", "/sub",
-                   c.image, "g++", *self.CXXFLAGS, "-I/sub", "-o", "/sub/agent.bin",
+                   c.image, *compiler, "-I/sub", "-o", "/sub/agent.bin",
                    "/harness/shim.cpp", *[f"/sub/{n}" for n in srcs]]
         else:
             cname = None
-            cmd = ["g++", *self.CXXFLAGS, f"-I{self.stage}", "-o", str(self.stage / "agent.bin"),
+            cmd = [*compiler, f"-I{self.stage}", "-o", str(self.stage / "agent.bin"),
                    str(HERE / "shim.cpp"), *[str(self.stage / n) for n in srcs]]
         os.chmod(self.stage, 0o777)        # compiler (uid 65534) must write agent.bin
         try:
@@ -563,7 +568,10 @@ def main():
     ap.add_argument("--cpus", type=int, default=d.cpus)
     ap.add_argument("--memory", default=d.memory)
     ap.add_argument("--pids", type=int, default=d.pids)
-    ap.add_argument("--gpus", default=None, help='e.g. "all" (needs the NVIDIA container toolkit)')
+    ap.add_argument("--gpus", default=d.gpus,
+                    help='expose GPU(s) to each agent; needs the NVIDIA container toolkit. '
+                         'e.g. "all", "device=0" (pin one card), "device=0,1", "device=GPU-<uuid>"')
+    ap.add_argument("--cuda-arch", default=d.cuda_arch, help="nvcc -arch for .cu agents (default sm_89)")
     ap.add_argument("--max-files", type=int, default=d.max_files)
     ap.add_argument("--max-mb", type=float, default=d.max_mb)
     ap.add_argument("--mode", choices=["sequential", "interleaved"], default=d.mode)
@@ -571,8 +579,8 @@ def main():
     cfg = Config(image=a.image, use_docker=not a.no_docker, games=a.games, master_seed=a.master_seed,
                  total_budget=a.total_budget, move_timeout=a.move_timeout,
                  first_move_timeout=a.first_move_timeout, illegal=a.illegal, cpus=a.cpus,
-                 memory=a.memory, pids=a.pids, gpus=a.gpus, max_files=a.max_files,
-                 max_mb=a.max_mb, mode=a.mode)
+                 memory=a.memory, pids=a.pids, gpus=a.gpus, cuda_arch=a.cuda_arch,
+                 max_files=a.max_files, max_mb=a.max_mb, mode=a.mode)
     outdir = Path(a.out) / time.strftime("run_%Y%m%d_%H%M%S")
     print(f"Results in {outdir}")
     run_competition(cfg, a.submissions, outdir, log=lambda s: print(s, flush=True))
