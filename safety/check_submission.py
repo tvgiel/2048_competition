@@ -72,12 +72,16 @@ def main():
     ap.add_argument("--move-timeout", type=float, default=d.move_timeout)
     ap.add_argument("--cpus", type=int, default=d.cpus)
     ap.add_argument("--memory", default=d.memory)
+    ap.add_argument("--gpus", default=d.gpus,
+                    help='expose GPU(s) to the agent (needs the NVIDIA container toolkit). '
+                         'e.g. "all", "device=0", "device=0,1"')
+    ap.add_argument("--cuda-arch", default=d.cuda_arch, help="nvcc -arch for .cu agents (default sm_89)")
     ap.add_argument("--out", default=None, help="keep logs in this directory (default: temp dir)")
     a = ap.parse_args()
 
     cfg = harness.Config(image=a.image, use_docker=not a.no_docker, games=a.games, master_seed=a.seed,
                          total_budget=a.total_budget, move_timeout=a.move_timeout,
-                         cpus=a.cpus, memory=a.memory)
+                         cpus=a.cpus, memory=a.memory, gpus=a.gpus, cuda_arch=a.cuda_arch)
     problems, warnings = [], []
 
     # 1. Structure and static checks
